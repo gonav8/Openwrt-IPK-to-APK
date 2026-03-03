@@ -14,3 +14,5 @@
 - [x] Add informational content about IPK vs APK formats
 - [x] Write vitest tests for conversion logic
 - [ ] Deploy to GitHub repository
+- [x] Add comprehensive README.md for GitHub repository
+- [x] Deploy to GitHub repository (gonav8/Openwrt-IPK-to-APK)
