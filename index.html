@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPK to APK Converter - OpenWrt V25.xx</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0e17;--surface:#111827;--border:#1e293b;--accent:#3b82f6;--accent-hover:#2563eb;--text:#e2e8f0;--text-muted:#94a3b8;--success:#22c55e;--error:#ef4444;--warning:#f59e0b}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.container{max-width:800px;margin:0 auto;padding:2rem 1rem}
+header{text-align:center;padding:3rem 0 2rem}
+header h1{font-size:2rem;font-weight:700;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+header p{color:var(--text-muted);margin-top:.5rem;font-size:.95rem}
+.badge{display:inline-block;padding:.2rem .6rem;border-radius:9999px;font-size:.75rem;font-weight:600;background:rgba(59,130,246,.15);color:var(--accent);border:1px solid rgba(59,130,246,.3);margin-top:.75rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1.5rem}
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:3rem 1.5rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface)}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(59,130,246,.05)}
+.upload-zone svg{width:48px;height:48px;color:var(--text-muted);margin-bottom:1rem}
+.upload-zone h3{font-size:1.1rem;margin-bottom:.25rem}
+.upload-zone p{color:var(--text-muted);font-size:.85rem}
+.hidden{display:none!important}
+.progress-bar{width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:1rem 0}
+.progress-bar .fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s;width:0}
+.status{padding:.75rem 1rem;border-radius:8px;font-size:.9rem;margin:.75rem 0;display:flex;align-items:center;gap:.5rem}
+.status.info{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);color:#93c5fd}
+.status.success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:#86efac}
+.status.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem;font-size:.85rem;margin:1rem 0}
+.meta-grid dt{color:var(--text-muted);font-weight:500}.meta-grid dd{color:var(--text);word-break:break-all}
+.btn{display:inline-flex;align-items:center;gap:.5rem;padding:.65rem 1.25rem;border-radius:8px;font-size:.9rem;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent-hover)}
+.btn-outline{background:transparent;color:var(--text-muted);border:1px solid var(--border)}.btn-outline:hover{border-color:var(--text-muted);color:var(--text)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-group{display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap}
+.log-box{background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--text-muted);max-height:200px;overflow-y:auto;margin-top:.75rem;line-height:1.8}
+.log-box .log-step{color:#93c5fd}.log-box .log-ok{color:#86efac}.log-box .log-err{color:#fca5a5}
+.info-section{margin-top:2rem}
+.info-section h2{font-size:1.25rem;margin-bottom:1rem;color:var(--text)}
+.info-section table{width:100%;border-collapse:collapse;font-size:.85rem}
+.info-section th,.info-section td{padding:.5rem .75rem;text-align:left;border-bottom:1px solid var(--border)}
+.info-section th{color:var(--text-muted);font-weight:600;background:rgba(255,255,255,.02)}
+.info-section td{color:var(--text)}
+footer{text-align:center;padding:2rem 0;color:var(--text-muted);font-size:.8rem;border-top:1px solid var(--border);margin-top:3rem}
+@media(max-width:600px){.meta-grid{grid-template-columns:1fr}header h1{font-size:1.5rem}.container{padding:1rem .75rem}}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>IPK to APK Converter</h1>
+    <p>Convert OpenWrt .ipk packages to .apk (APKv3) format for V25.xx</p>
+    <span class="badge">100% Client-Side &mdash; No Upload Required</span>
+  </header>
+
+  <div id="uploadZone" class="upload-zone" tabindex="0">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+    <h3>Drop your .ipk file here</h3>
+    <p>or click to browse &mdash; max 50 MB</p>
+    <input type="file" id="fileInput" accept=".ipk" class="hidden">
+  </div>
+
+  <div id="resultArea" class="hidden">
+    <div class="card">
+      <div id="statusMsg" class="status info">Processing...</div>
+      <div id="progressWrap" class="progress-bar"><div id="progressFill" class="fill"></div></div>
+      <div id="logBox" class="log-box"></div>
+    </div>
+
+    <div id="metaCard" class="card hidden">
+      <h3 style="margin-bottom:.75rem">Package Metadata</h3>
+      <dl id="metaGrid" class="meta-grid"></dl>
+      <div class="btn-group">
+        <button id="downloadBtn" class="btn btn-primary" disabled>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Download .apk
+        </button>
+        <button id="resetBtn" class="btn btn-outline">Convert Another</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-section">
+    <h2>Format Comparison</h2>
+    <table>
+      <thead><tr><th>Feature</th><th>IPK (opkg)</th><th>APK (apk-tools 3.x)</th></tr></thead>
+      <tbody>
+        <tr><td>Used in</td><td>OpenWrt &le; V24.xx</td><td>OpenWrt &ge; V25.xx</td></tr>
+        <tr><td>Archive format</td><td>ar + tar.gz</td><td>ADB binary (deflate)</td></tr>
+        <tr><td>Metadata</td><td>Debian-style control</td><td>Binary object tree</td></tr>
+        <tr><td>Signatures</td><td>Optional</td><td>Built-in SIG blocks</td></tr>
+        <tr><td>File hashes</td><td>md5sums (optional)</td><td>SHA-256 per file</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="info-section">
+    <h2>Script Mapping</h2>
+    <table>
+      <thead><tr><th>IPK Script</th><th>APK Script</th></tr></thead>
+      <tbody>
+        <tr><td>preinst</td><td>pre-install</td></tr>
+        <tr><td>postinst</td><td>post-install</td></tr>
+        <tr><td>prerm</td><td>pre-deinstall</td></tr>
+        <tr><td>postrm</td><td>post-deinstall</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    <p>IPK2APK Converter &mdash; Built for the OpenWrt community</p>
+    <p style="margin-top:.25rem">Conversion runs entirely in your browser. No files are uploaded to any server.</p>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script>
+"use strict";
+
+// ============================================================
+// ADB Writer - Pure JS implementation of Alpine's ADB format
+// ============================================================
+class ADBWriter {
+  constructor(schema) {
+    this.buf = new Uint8Array(8192);
+    this.len = 0;
+    this.schema = schema;
+    // Write adb_hdr: compat_ver(1) + adb_ver(1) + reserved(2) + root(4) = 8 bytes
+    this._append(new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0]));
+  }
+
+  _grow(needed) {
+    while (this.len + needed > this.buf.length) {
+      const nb = new Uint8Array(this.buf.length * 2);
+      nb.set(this.buf);
+      this.buf = nb;
+    }
+  }
+
+  _align(alignment) {
+    const pad = (alignment - (this.len % alignment)) % alignment;
+    if (pad > 0) {
+      this._grow(pad);
+      this.buf.fill(0, this.len, this.len + pad);
+      this.len += pad;
+    }
+  }
+
+  _append(data) {
+    this._grow(data.length);
+    this.buf.set(data, this.len);
+    this.len += data.length;
+  }
+
+  _writeU32LE(offset, val) {
+    this.buf[offset] = val & 0xff;
+    this.buf[offset+1] = (val >>> 8) & 0xff;
+    this.buf[offset+2] = (val >>> 16) & 0xff;
+    this.buf[offset+3] = (val >>> 24) & 0xff;
+  }
+
+  _readU32LE(offset) {
+    return this.buf[offset] | (this.buf[offset+1] << 8) | (this.buf[offset+2] << 16) | (this.buf[offset+3] << 24);
+  }
+
+  writeBlob(data) {
+    if (!data || data.length === 0) return 0; // ADB_NULL
+    const len = data.length;
+    let type, hdrSize;
+    if (len > 0xffff) {
+      type = 0xa0000000; hdrSize = 4; // BLOB_32
+    } else if (len > 0xff) {
+      type = 0x90000000; hdrSize = 2; // BLOB_16
+    } else {
+      type = 0x80000000; hdrSize = 1; // BLOB_8
+    }
+    this._align(hdrSize);
+    const offset = this.len;
+    this._grow(hdrSize + len);
+    if (hdrSize === 1) {
+      this.buf[this.len] = len;
+    } else if (hdrSize === 2) {
+      this.buf[this.len] = len & 0xff;
+      this.buf[this.len+1] = (len >>> 8) & 0xff;
+    } else {
+      this._writeU32LE(this.len, len);
+    }
+    this.len += hdrSize;
+    this.buf.set(data, this.len);
+    this.len += len;
+    return (type | offset) >>> 0;
+  }
+
+  writeString(str) {
+    if (!str) return 0;
+    return this.writeBlob(new TextEncoder().encode(str));
+  }
+
+  writeInt(val) {
+    val = Number(val) || 0;
+    if (val < 0) val = 0;
+    if (val >= 0x100000000) {
+      // INT_64
+      this._align(4);
+      const offset = this.len;
+      this._grow(8);
+      this._writeU32LE(this.len, val & 0xffffffff);
+      this._writeU32LE(this.len + 4, Math.floor(val / 0x100000000));
+      this.len += 8;
+      return (0x30000000 | offset) >>> 0;
+    }
+    if (val >= 0x10000000) {
+      // INT_32
+      this._align(4);
+      const offset = this.len;
+      this._grow(4);
+      this._writeU32LE(this.len, val);
+      this.len += 4;
+      return (0x20000000 | offset) >>> 0;
+    }
+    // Direct INT
+    return (0x10000000 | val) >>> 0;
+  }
+
+  writeObject(slots) {
+    // slots is an array where index 0 is unused (ADBI_NUM_ENTRIES)
+    // Trim trailing nulls
+    let n = slots.length;
+    while (n > 1 && slots[n-1] === 0) n--;
+    if (n <= 1) return 0; // empty object
+    this._align(4);
+    const offset = this.len;
+    this._grow(n * 4);
+    this._writeU32LE(this.len, n); // num entries
+    for (let i = 1; i < n; i++) {
+      this._writeU32LE(this.len + i * 4, slots[i] || 0);
+    }
+    this.len += n * 4;
+    return (0xe0000000 | offset) >>> 0;
+  }
+
+  writeArray(items) {
+    if (!items || items.length === 0) return 0;
+    const n = items.length + 1; // +1 for count
+    this._align(4);
+    const offset = this.len;
+    this._grow(n * 4);
+    this._writeU32LE(this.len, n);
+    for (let i = 0; i < items.length; i++) {
+      this._writeU32LE(this.len + (i + 1) * 4, items[i] || 0);
+    }
+    this.len += n * 4;
+    return (0xd0000000 | offset) >>> 0;
+  }
+
+  setRoot(val) {
+    this._writeU32LE(4, val); // root is at offset 4 in adb_hdr
+  }
+
+  getBuffer() {
+    return this.buf.slice(0, this.len);
+  }
+}
+
+// ============================================================
+// Block writer - assembles the final APK file
+// ============================================================
+function makeBlockHeader(type, length) {
+  // type in bits 31-30, raw size (including 4-byte header) in bits 29-0
+  const rawSize = 4 + length;
+  if (rawSize > 0x3fffffff) throw new Error("Block too large");
+  const val = ((type << 30) | rawSize) >>> 0;
+  const b = new Uint8Array(4);
+  b[0] = val & 0xff; b[1] = (val>>>8)&0xff; b[2] = (val>>>16)&0xff; b[3] = (val>>>24)&0xff;
+  return b;
+}
+
+function padTo8(data) {
+  const rem = data.length % 8;
+  if (rem === 0) return data;
+  const padded = new Uint8Array(data.length + (8 - rem));
+  padded.set(data);
+  return padded;
+}
+
+// ============================================================
+// IPK Parser
+// ============================================================
+function parseIPK(arrayBuffer) {
+  const data = new Uint8Array(arrayBuffer);
+  let decompressed;
+  // IPK can be: 1) gzip-compressed tar (ar archive), or 2) just a gzip tar
+  // Check for gzip magic
+  if (data[0] === 0x1f && data[1] === 0x8b) {
+    decompressed = pako.ungzip(data);
+  } else if (data[0] === 0x21 && data[1] === 0x3c) {
+    // ar archive: "!<arch>\n"
+    decompressed = data; // handle ar format
+    return parseArArchive(decompressed);
+  } else {
+    throw new Error("Unknown IPK format. Expected gzip or ar archive.");
+  }
+  // Parse as tar
+  return parseTarForIPK(decompressed);
+}
+
+function parseArArchive(data) {
+  const sig = new TextDecoder().decode(data.slice(0, 8));
+  if (!sig.startsWith("!<arch>")) throw new Error("Not a valid ar archive");
+  let offset = 8;
+  const members = {};
+  while (offset < data.length) {
+    if (offset % 2 !== 0) offset++; // ar entries are 2-byte aligned
+    const hdr = new TextDecoder().decode(data.slice(offset, offset + 60));
+    const name = hdr.slice(0, 16).trim().replace(/\/$/, '');
+    const size = parseInt(hdr.slice(48, 58).trim(), 10);
+    offset += 60;
+    members[name] = data.slice(offset, offset + size);
+    offset += size;
+  }
+  // Extract control.tar.gz and data.tar.gz
+  let controlTar, dataTar, debianBinary;
+  for (const [name, content] of Object.entries(members)) {
+    if (name === 'debian-binary') debianBinary = content;
+    else if (name.startsWith('control.tar')) controlTar = content;
+    else if (name.startsWith('data.tar')) dataTar = content;
+  }
+  if (!controlTar) throw new Error("Missing control.tar.gz in IPK");
+  if (!dataTar) throw new Error("Missing data.tar.gz in IPK");
+  // Decompress
+  const controlFiles = parseTar(tryDecompress(controlTar));
+  const dataFiles = parseTar(tryDecompress(dataTar));
+  return { controlFiles, dataFiles };
+}
+
+function parseTarForIPK(tarData) {
+  // The IPK might be a single tar containing debian-binary, control.tar.gz, data.tar.gz
+  const entries = parseTar(tarData);
+  let controlTar, dataTar;
+  for (const entry of entries) {
+    if (entry.name.includes('control.tar')) controlTar = entry.data;
+    else if (entry.name.includes('data.tar')) dataTar = entry.data;
+  }
+  if (!controlTar) throw new Error("Missing control.tar.gz in IPK");
+  if (!dataTar) throw new Error("Missing data.tar.gz in IPK");
+  const controlFiles = parseTar(tryDecompress(controlTar));
+  const dataFiles = parseTar(tryDecompress(dataTar));
+  return { controlFiles, dataFiles };
+}
+
+function tryDecompress(data) {
+  if (data[0] === 0x1f && data[1] === 0x8b) return pako.ungzip(data);
+  // Try xz/lzma - not supported in browser, but most IPKs use gzip
+  return data;
+}
+
+function parseTar(data) {
+  const entries = [];
+  let offset = 0;
+  while (offset + 512 <= data.length) {
+    const header = data.slice(offset, offset + 512);
+    // Check for empty block (end of archive)
+    if (header.every(b => b === 0)) { offset += 512; continue; }
+    const name = readTarString(header, 0, 100);
+    const sizeStr = readTarString(header, 124, 12);
+    const modeStr = readTarString(header, 100, 8);
+    const mtimeStr = readTarString(header, 136, 12);
+    const typeFlag = String.fromCharCode(header[156]);
+    const prefix = readTarString(header, 345, 155);
+    const fullName = prefix ? prefix + '/' + name : name;
+    const size = parseInt(sizeStr, 8) || 0;
+    const mode = parseInt(modeStr, 8) || 0;
+    const mtime = parseInt(mtimeStr, 8) || 0;
+    offset += 512;
+    let fileData = null;
+    if (size > 0) {
+      fileData = data.slice(offset, offset + size);
+      offset += Math.ceil(size / 512) * 512;
+    }
+    entries.push({ name: cleanPath(fullName), data: fileData, size, mode, mtime, type: typeFlag });
+  }
+  return entries;
+}
+
+function readTarString(buf, offset, len) {
+  let end = offset;
+  while (end < offset + len && buf[end] !== 0) end++;
+  return new TextDecoder().decode(buf.slice(offset, end));
+}
+
+function cleanPath(p) {
+  return p.replace(/^\.\//, '').replace(/\/+$/, '');
+}
+
+// ============================================================
+// Control file parser
+// ============================================================
+function parseControl(controlFiles) {
+  let controlText = '';
+  for (const f of controlFiles) {
+    if (f.name === 'control' || f.name === './control') {
+      controlText = new TextDecoder().decode(f.data);
+      break;
+    }
+  }
+  if (!controlText) throw new Error("No control file found in IPK");
+  const meta = {};
+  const lines = controlText.split('\n');
+  let lastKey = '';
+  for (const line of lines) {
+    if (line.startsWith(' ') || line.startsWith('\t')) {
+      if (lastKey) meta[lastKey] += '\n' + line;
+    } else {
+      const idx = line.indexOf(':');
+      if (idx > 0) {
+        lastKey = line.slice(0, idx).trim().toLowerCase();
+        meta[lastKey] = line.slice(idx + 1).trim();
+      }
+    }
+  }
+  // Extract scripts
+  const scripts = {};
+  const scriptNames = ['preinst', 'postinst', 'prerm', 'postrm'];
+  for (const f of controlFiles) {
+    const bn = f.name.replace(/^\.\//, '');
+    if (scriptNames.includes(bn) && f.data) {
+      scripts[bn] = new TextDecoder().decode(f.data);
+    }
+  }
+  return { meta, scripts };
+}
+
+// ============================================================
+// SHA-256 (Web Crypto API)
+// ============================================================
+async function sha256(data) {
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return new Uint8Array(hash);
+}
+
+async function sha1(data) {
+  const hash = await crypto.subtle.digest('SHA-1', data);
+  return new Uint8Array(hash);
+}
+
+// ============================================================
+// Convert IPK to APK
+// ============================================================
+async function convertIPKtoAPK(ipkBuffer, log) {
+  log('step', 'Parsing IPK archive...');
+  const { controlFiles, dataFiles } = parseIPK(ipkBuffer);
+  log('ok', `Found ${controlFiles.length} control entries, ${dataFiles.length} data entries`);
+
+  log('step', 'Parsing control metadata...');
+  const { meta, scripts } = parseControl(controlFiles);
+  log('ok', `Package: ${meta.package || 'unknown'} v${meta.version || '?'}`);
+
+  // Build directory tree from data files
+  log('step', 'Building file tree...');
+  const dirs = new Map(); // dirname -> { files: [{name, data, mode, mtime}], mode }
+  const fileContents = []; // ordered list of {pathIdx, fileIdx, data}
+
+  // Separate files from directories
+  const realFiles = dataFiles.filter(f => f.type !== '5' && f.type !== 'd' && f.data && f.data.length > 0);
+  const dirEntries = dataFiles.filter(f => f.type === '5' || f.type === 'd' || (!f.data && f.name.endsWith('/')));
+
+  // Register directories
+  for (const d of dirEntries) {
+    const name = d.name.replace(/\/$/, '');
+    if (!dirs.has(name)) dirs.set(name, { files: [], mode: d.mode || 0o755 });
+  }
+
+  // Ensure parent dirs exist for all files
+  for (const f of realFiles) {
+    const parts = f.name.split('/');
+    const fileName = parts.pop();
+    const dirName = parts.join('/');
+    if (!dirs.has(dirName)) dirs.set(dirName, { files: [], mode: 0o755 });
+    // Also ensure all parent paths
+    for (let i = 1; i < parts.length; i++) {
+      const parent = parts.slice(0, i).join('/');
+      if (!dirs.has(parent)) dirs.set(parent, { files: [], mode: 0o755 });
+    }
+    dirs.get(dirName).files.push({
+      name: fileName,
+      data: f.data,
+      mode: f.mode || 0o644,
+      mtime: f.mtime || Math.floor(Date.now() / 1000),
+      size: f.data.length
+    });
+  }
+
+  // Add root dir if not present
+  if (!dirs.has('')) dirs.set('', { files: [], mode: 0o755 });
+
+  // Sort directories
+  const sortedDirs = [...dirs.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+  log('ok', `${sortedDirs.length} directories, ${realFiles.length} files`);
+
+  // Build ADB
+  log('step', 'Building ADB binary tree...');
+  const adb = new ADBWriter(0x676b6370); // ADB_SCHEMA_PACKAGE
+
+  // Build pkginfo object
+  const version = convertVersion(meta.version || '0');
+  const arch = meta.architecture === 'all' ? 'noarch' : (meta.architecture || 'noarch');
+  let installedSize = 0;
+  for (const f of realFiles) installedSize += f.data.length;
+  if (installedSize === 0 && Object.keys(scripts).length > 0) installedSize = 1;
+
+  // Placeholder for hashes (20 bytes SHA1) - will be filled after ADB is complete
+  const hashPlaceholder = new Uint8Array(20);
+  const hashBlobVal = adb.writeBlob(hashPlaceholder);
+  // Remember offset of the hash data for later patching
+  const hashOffset = (hashBlobVal & 0x0fffffff) + 1; // +1 for the length byte (blob8)
+
+  // Parse dependencies
+  const depVals = [];
+  if (meta.depends) {
+    const deps = meta.depends.split(/[,\s]+/).filter(d => d.trim());
+    for (const dep of deps) {
+      const depSlots = new Array(4).fill(0); // ADBI_DEP_MAX = 4
+      // Parse version constraints like "pkg (>= 1.0)"
+      const m = dep.match(/^([^\s(]+)(?:\s*\(([<>=!]+)\s*([^)]+)\))?$/);
+      if (m) {
+        depSlots[1] = adb.writeString(m[1]); // name
+        if (m[2] && m[3]) {
+          depSlots[2] = adb.writeString(convertVersion(m[3])); // version
+          depSlots[3] = adb.writeInt(mapMatchOp(m[2])); // match
+        }
+      } else {
+        depSlots[1] = adb.writeString(dep.trim());
+      }
+      depVals.push(adb.writeObject(depSlots));
+    }
+  }
+
+  // Build pkginfo
+  const piSlots = new Array(0x16).fill(0); // ADBI_PI_MAX = 0x16
+  piSlots[0x01] = adb.writeString(meta.package || 'unknown');
+  piSlots[0x02] = adb.writeString(version);
+  piSlots[0x03] = hashBlobVal;
+  if (meta.description) piSlots[0x04] = adb.writeString(meta.description);
+  piSlots[0x05] = adb.writeString(arch);
+  piSlots[0x06] = adb.writeString(meta.license || 'Unknown');
+  if (meta.source) piSlots[0x07] = adb.writeString(meta.source);
+  if (meta.maintainer) piSlots[0x08] = adb.writeString(meta.maintainer);
+  if (meta.homepage) piSlots[0x09] = adb.writeString(meta.homepage);
+  piSlots[0x0c] = adb.writeInt(installedSize);
+  if (depVals.length > 0) piSlots[0x0f] = adb.writeArray(depVals);
+
+  const pkginfoVal = adb.writeObject(piSlots);
+
+  // Build paths array
+  log('step', 'Encoding file metadata and hashes...');
+  const pathVals = [];
+  let pathIdx = 0;
+  const dataBlockInfo = []; // {pathIdx, fileIdx, data}
+
+  for (const [dirName, dirInfo] of sortedDirs) {
+    pathIdx++;
+    // Build ACL for directory
+    const dirAclSlots = new Array(5).fill(0);
+    dirAclSlots[1] = adb.writeInt(dirInfo.mode);
+    dirAclSlots[2] = adb.writeString('root');
+    dirAclSlots[3] = adb.writeString('root');
+    const dirAclVal = adb.writeObject(dirAclSlots);
+
+    // Build file entries
+    const fileVals = [];
+    let fileIdx = 0;
+    for (const file of dirInfo.files) {
+      fileIdx++;
+      const fileHash = await sha256(file.data);
+      const fileAclSlots = new Array(5).fill(0);
+      fileAclSlots[1] = adb.writeInt(file.mode);
+      fileAclSlots[2] = adb.writeString('root');
+      fileAclSlots[3] = adb.writeString('root');
+      const fileAclVal = adb.writeObject(fileAclSlots);
+
+      const fiSlots = new Array(7).fill(0); // ADBI_FI_MAX = 7
+      fiSlots[1] = adb.writeString(file.name);
+      fiSlots[2] = fileAclVal;
+      fiSlots[3] = adb.writeInt(file.size);
+      fiSlots[4] = adb.writeInt(file.mtime);
+      fiSlots[5] = adb.writeBlob(fileHash);
+      fileVals.push(adb.writeObject(fiSlots));
+
+      dataBlockInfo.push({ pathIdx, fileIdx, data: file.data });
+    }
+
+    const diSlots = new Array(4).fill(0); // ADBI_DI_MAX = 4
+    if (dirName) diSlots[1] = adb.writeString(dirName);
+    diSlots[2] = dirAclVal;
+    if (fileVals.length > 0) diSlots[3] = adb.writeArray(fileVals);
+    pathVals.push(adb.writeObject(diSlots));
+  }
+
+  const pathsVal = adb.writeArray(pathVals);
+
+  // Build scripts object
+  let scriptsVal = 0;
+  const scriptMap = {
+    'preinst': 0x02,   // ADBI_SCRPT_PREINST
+    'postinst': 0x03,  // ADBI_SCRPT_POSTINST
+    'prerm': 0x04,     // ADBI_SCRPT_PREDEINST
+    'postrm': 0x05     // ADBI_SCRPT_POSTDEINST
+  };
+  if (Object.keys(scripts).length > 0) {
+    const scrSlots = new Array(8).fill(0); // ADBI_SCRPT_MAX = 8
+    for (const [name, content] of Object.entries(scripts)) {
+      const idx = scriptMap[name];
+      if (idx) scrSlots[idx] = adb.writeString(content);
+    }
+    scriptsVal = adb.writeObject(scrSlots);
+  }
+
+  // Build root package object
+  const pkgSlots = new Array(6).fill(0); // ADBI_PKG_MAX = 6
+  pkgSlots[1] = pkginfoVal;
+  pkgSlots[2] = pathsVal;
+  if (scriptsVal) pkgSlots[3] = scriptsVal;
+  const rootVal = adb.writeObject(pkgSlots);
+  adb.setRoot(rootVal);
+
+  // Compute unique ID (SHA256 of ADB buffer, take first 20 bytes as SHA1-length hash)
+  const adbBuf = adb.getBuffer();
+  const adbHash = await sha256(adbBuf);
+  // Patch the hash into the ADB buffer
+  for (let i = 0; i < 20; i++) {
+    adbBuf[hashOffset + i] = adbHash[i];
+  }
+
+  log('ok', 'ADB tree built successfully');
+
+  // Assemble the final file
+  log('step', 'Assembling APK v3 package...');
+
+  // Build uncompressed content: file_header + ADB block + DATA blocks
+  const parts = [];
+
+  // File header: ADB_FORMAT_MAGIC + schema
+  const fileHdr = new Uint8Array(8);
+  // ADB_FORMAT_MAGIC = 0x2e424441 = "ADB."
+  fileHdr[0] = 0x41; fileHdr[1] = 0x44; fileHdr[2] = 0x42; fileHdr[3] = 0x2e;
+  // Schema = 0x676b6370 = "pckg"
+  fileHdr[4] = 0x70; fileHdr[5] = 0x63; fileHdr[6] = 0x6b; fileHdr[7] = 0x67;
+  parts.push(fileHdr);
+
+  // ADB block
+  const adbBlockHdr = makeBlockHeader(0, adbBuf.length); // type=0 (ADB)
+  parts.push(padTo8(concatArrays([adbBlockHdr, adbBuf])));
+
+  // DATA blocks
+  for (const db of dataBlockInfo) {
+    if (db.data.length === 0) continue;
+    const dataHdr = new Uint8Array(8);
+    dataHdr[0] = db.pathIdx & 0xff; dataHdr[1] = (db.pathIdx>>>8)&0xff;
+    dataHdr[2] = (db.pathIdx>>>16)&0xff; dataHdr[3] = (db.pathIdx>>>24)&0xff;
+    dataHdr[4] = db.fileIdx & 0xff; dataHdr[5] = (db.fileIdx>>>8)&0xff;
+    dataHdr[6] = (db.fileIdx>>>16)&0xff; dataHdr[7] = (db.fileIdx>>>24)&0xff;
+    const blockContent = concatArrays([dataHdr, db.data]);
+    const blockHdr = makeBlockHeader(2, blockContent.length); // type=2 (DATA)
+    parts.push(padTo8(concatArrays([blockHdr, blockContent])));
+  }
+
+  const uncompressed = concatArrays(parts);
+
+  // Compress with deflate and prepend "ADBd" marker
+  const compressed = pako.deflateRaw(uncompressed);
+  const magic = new Uint8Array([0x41, 0x44, 0x42, 0x64]); // "ADBd"
+  const finalApk = concatArrays([magic, compressed]);
+
+  log('ok', `APK package created: ${formatSize(finalApk.length)}`);
+
+  return {
+    data: finalApk,
+    filename: `${meta.package || 'converted'}-${version}.apk`,
+    meta: {
+      'Package': meta.package || 'unknown',
+      'Version': version,
+      'Architecture': arch,
+      'Description': meta.description || '-',
+      'License': meta.license || 'Unknown',
+      'Maintainer': meta.maintainer || '-',
+      'Installed Size': formatSize(installedSize),
+      'Dependencies': meta.depends || 'none',
+      'Scripts': Object.keys(scripts).join(', ') || 'none',
+      'Files': `${realFiles.length} files in ${sortedDirs.length} directories`,
+      'Output Size': formatSize(finalApk.length)
+    }
+  };
+}
+
+function convertVersion(v) {
+  if (!v) return '0-r0';
+  let ver = v.replace(/[^a-zA-Z0-9._+~-]/g, '');
+  if (!ver.includes('-r')) {
+    ver = ver.replace(/-(\d+)$/, '-r$1');
+    if (!ver.includes('-r')) ver += '-r0';
+  }
+  return ver;
+}
+
+function mapMatchOp(op) {
+  // APK match flags from apk_version.h
+  switch(op) {
+    case '>=': return 0x04; // APK_VERSION_GREATER | APK_VERSION_EQUAL
+    case '<=': return 0x06;
+    case '>': return 0x04;
+    case '<': return 0x02;
+    case '=': return 0x01;
+    case '!=': return 0x08;
+    default: return 0x01;
+  }
+}
+
+function concatArrays(arrays) {
+  let total = 0;
+  for (const a of arrays) total += a.length;
+  const result = new Uint8Array(total);
+  let offset = 0;
+  for (const a of arrays) { result.set(a, offset); offset += a.length; }
+  return result;
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// ============================================================
+// UI Logic
+// ============================================================
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+const resultArea = document.getElementById('resultArea');
+const statusMsg = document.getElementById('statusMsg');
+const progressFill = document.getElementById('progressFill');
+const progressWrap = document.getElementById('progressWrap');
+const logBox = document.getElementById('logBox');
+const metaCard = document.getElementById('metaCard');
+const metaGrid = document.getElementById('metaGrid');
+const downloadBtn = document.getElementById('downloadBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+let convertedBlob = null;
+let convertedFilename = '';
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('keydown', e => { if (e.key === 'Enter') fileInput.click(); });
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFile(fileInput.files[0]); });
+
+downloadBtn.addEventListener('click', () => {
+  if (!convertedBlob) return;
+  const url = URL.createObjectURL(convertedBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = convertedFilename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+resetBtn.addEventListener('click', () => {
+  resultArea.classList.add('hidden');
+  metaCard.classList.add('hidden');
+  uploadZone.classList.remove('hidden');
+  logBox.innerHTML = '';
+  fileInput.value = '';
+  convertedBlob = null;
+});
+
+function log(type, msg) {
+  const cls = type === 'step' ? 'log-step' : type === 'ok' ? 'log-ok' : 'log-err';
+  const prefix = type === 'step' ? '▸ ' : type === 'ok' ? '✓ ' : '✗ ';
+  logBox.innerHTML += `<div class="${cls}">${prefix}${msg}</div>`;
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+async function handleFile(file) {
+  if (!file.name.endsWith('.ipk')) {
+    alert('Please select a .ipk file');
+    return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    alert('File too large. Maximum size is 50 MB.');
+    return;
+  }
+
+  uploadZone.classList.add('hidden');
+  resultArea.classList.remove('hidden');
+  metaCard.classList.add('hidden');
+  logBox.innerHTML = '';
+  progressFill.style.width = '0%';
+  statusMsg.className = 'status info';
+  statusMsg.textContent = 'Converting...';
+  downloadBtn.disabled = true;
+
+  try {
+    log('step', `Reading ${file.name} (${formatSize(file.size)})...`);
+    progressFill.style.width = '10%';
+
+    const buffer = await file.arrayBuffer();
+    progressFill.style.width = '20%';
+
+    const result = await convertIPKtoAPK(buffer, log);
+    progressFill.style.width = '100%';
+
+    convertedBlob = new Blob([result.data], { type: 'application/octet-stream' });
+    convertedFilename = result.filename;
+
+    // Show metadata
+    metaGrid.innerHTML = '';
+    for (const [key, val] of Object.entries(result.meta)) {
+      metaGrid.innerHTML += `<dt>${key}</dt><dd>${val}</dd>`;
+    }
+    metaCard.classList.remove('hidden');
+    downloadBtn.disabled = false;
+
+    statusMsg.className = 'status success';
+    statusMsg.innerHTML = `<strong>Conversion successful!</strong> &mdash; ${result.filename}`;
+    progressWrap.classList.add('hidden');
+  } catch (err) {
+    statusMsg.className = 'status error';
+    statusMsg.textContent = 'Conversion failed: ' + err.message;
+    log('err', err.message);
+    progressFill.style.width = '0%';
+    console.error(err);
+  }
+}
+</script>
+</body>
+</html>
